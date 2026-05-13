@@ -536,7 +536,7 @@
     // ==========================================
     // PROSES PRESENSI — LANGSUNG KE FIRESTORE
     // ==========================================
-    async function prosesPresensi() {
+    async function prosesPresensi(konfirmasiPulang = false) {
       const nisn = document.getElementById('nisn-input').value.trim();
       if (!nisn) return;
 
@@ -608,8 +608,6 @@
           const emoji = status === 'HADIR' ? '✅' : '⏰';
           const badgeClass = status === 'HADIR' ? 'badge-hadir' : 'badge-terlambat';
           showResult('success', emoji, siswa.nama, `Presensi Masuk · ${nowTime}`, status, badgeClass);
-
-          // Update stats
           updateStats(status === 'TERLAMBAT' ? 'terlambat' : 'masuk');
 
         } else {
@@ -620,9 +618,26 @@
           if (presensiData.jam_keluar && presensiData.jam_keluar !== '') {
             showResult('warning', '⚠️', siswa.nama, 'Sudah melakukan presensi pulang hari ini.', null, null);
           } else {
-            await updateDoc(doc(db, 'presensi', presensiDoc.id), {
-              jam_keluar: nowTime
-            });
+            // Hitung selisih waktu masuk dan sekarang
+            const jamMasukParts = presensiData.jam_masuk.split(':');
+            const nowParts = nowTime.split(':');
+            const menitMasuk = parseInt(jamMasukParts[0]) * 60 + parseInt(jamMasukParts[1]);
+            const menitNow = parseInt(nowParts[0]) * 60 + parseInt(nowParts[1]);
+            const selisihMenit = menitNow - menitMasuk;
+
+            // Jika belum konfirmasi DAN selisih < 60 menit → tampilkan konfirmasi
+            if (!konfirmasiPulang && selisihMenit < 60) {
+              card.style.display = 'none';
+              btn.disabled = false;
+              btn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Proses`;
+              const nisnSementara = nisn;
+              document.getElementById('nisn-input').value = '';
+              showKonfirmasiPulang(siswa.nama, presensiData.jam_masuk, selisihMenit, nisnSementara);
+              return;
+            }
+
+            // Selisih > 60 menit atau sudah konfirmasi → langsung pulang
+            await updateDoc(doc(db, 'presensi', presensiDoc.id), { jam_keluar: nowTime });
             showResult('success', '🏠', siswa.nama, `Presensi Pulang · ${nowTime}`, 'PULANG', 'badge-pulang');
             updateStats('pulang');
           }
@@ -644,6 +659,59 @@
         document.getElementById('nisn-input').value = '';
         document.getElementById('nisn-input').focus();
       }
+    }
+
+    // ==========================================
+    // KONFIRMASI PULANG
+    // ==========================================
+    function showKonfirmasiPulang(nama, jamMasuk, selisihMenit, nisn) {
+      const overlay = document.createElement('div');
+      overlay.id = 'overlay-konfirmasi-pulang';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:flex-end;justify-content:center;padding:16px;';
+      overlay.innerHTML = `
+        <div style="background:white;border-radius:20px;width:100%;max-width:400px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+          <div style="background:#fffbeb;border-bottom:1px solid #fde68a;padding:20px;text-align:center;">
+            <div style="font-size:40px;margin-bottom:8px;">⚠️</div>
+            <p style="font-weight:800;color:#1e293b;font-size:16px;margin:0;">Konfirmasi Presensi Pulang</p>
+          </div>
+          <div style="padding:20px;">
+            <div style="background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center;">
+              <p style="font-weight:800;color:#1e293b;font-size:18px;margin:0 0 6px;">${nama}</p>
+              <p style="font-size:13px;color:#64748b;margin:0 0 4px;">
+                Sudah presensi masuk pukul <strong style="color:#2563eb;">${jamMasuk}</strong>
+              </p>
+              <p style="font-size:12px;color:#d97706;font-weight:700;margin:0;">
+                ⏱ Baru ${selisihMenit} menit yang lalu
+              </p>
+            </div>
+            <p style="font-size:13px;color:#64748b;text-align:center;margin:0 0 16px;">
+              Apakah ini <strong>presensi pulang</strong>?
+            </p>
+            <div style="display:flex;gap:10px;">
+              <button id="btn-batal-pulang"
+                style="flex:1;background:#f1f5f9;color:#475569;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">
+                ❌ Batal
+              </button>
+              <button id="btn-ya-pulang"
+                style="flex:1;background:#2563eb;color:white;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">
+                🏠 Ya, Pulang
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      document.getElementById('btn-batal-pulang').onclick = () => {
+        overlay.remove();
+        document.getElementById('nisn-input').focus();
+      };
+
+      document.getElementById('btn-ya-pulang').onclick = () => {
+        overlay.remove();
+        document.getElementById('nisn-input').value = nisn;
+        prosesPresensi(true); // konfirmasiPulang = true
+      };
     }
 
     // ==========================================
