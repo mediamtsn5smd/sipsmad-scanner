@@ -379,9 +379,118 @@
     }
 
     .flash-error { animation: flashRed 0.6s ease; }
+
+    /* PIN Screen */
+    .pin-screen {
+      position: fixed;
+      inset: 0;
+      background: var(--slate-50);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .pin-card {
+      background: white;
+      border-radius: 24px;
+      padding: 32px 24px;
+      width: 100%;
+      max-width: 360px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+
+    .pin-logo {
+      width: 56px;
+      height: 56px;
+      background: var(--blue);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+    }
+
+    .pin-input {
+      width: 100%;
+      border: 2px solid var(--slate-200);
+      border-radius: 12px;
+      padding: 14px;
+      font-size: 28px;
+      font-weight: 800;
+      text-align: center;
+      letter-spacing: 10px;
+      outline: none;
+      font-family: monospace;
+      margin: 20px 0 16px;
+      transition: border-color 0.2s;
+      color: var(--slate-800);
+    }
+
+    .pin-input:focus { border-color: var(--blue); }
+
+    .pin-input.error {
+      border-color: var(--red);
+      animation: shake 0.3s ease;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-8px); }
+      75% { transform: translateX(8px); }
+    }
+
+    .pin-btn {
+      width: 100%;
+      background: var(--blue);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+
+    .pin-btn:hover { background: var(--blue-dark); }
+
+    .pin-error {
+      color: var(--red);
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 10px;
+      display: none;
+    }
+
   </style>
 </head>
 <body>
+
+  <!-- PIN SCREEN -->
+  <div class="pin-screen" id="pin-screen">
+    <div class="pin-card">
+      <div class="pin-logo">
+        <svg width="28" height="28" fill="none" stroke="white" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+      </div>
+      <h2 style="font-size:20px;font-weight:800;color:#1e293b;margin:0 0 4px;">SIPSMAD Scanner</h2>
+      <p style="font-size:13px;color:#94a3b8;margin:0;">Masukkan PIN untuk melanjutkan</p>
+      <input type="password" id="pin-input" class="pin-input"
+        placeholder="••••"
+        maxlength="6"
+        inputmode="numeric"
+        onkeydown="if(event.key==='Enter') cekPin()">
+      <button class="pin-btn" onclick="cekPin()">🔓 Masuk</button>
+      <p class="pin-error" id="pin-error">❌ PIN salah. Coba lagi.</p>
+      <p style="font-size:11px;color:#cbd5e1;margin-top:16px;">Hubungi admin jika lupa PIN</p>
+    </div>
+  </div>
 
   <!-- Header -->
   <header class="header">
@@ -488,6 +597,60 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+
+    // ==========================================
+    // PIN PROTECTION
+    // ==========================================
+    const SCANNER_PIN = '20279008'; // ← GANTI dengan PIN sekolah Anda
+    const PIN_KEY = 'sipsmad_scanner_auth';
+    const PIN_EXPIRE = 8 * 60 * 60 * 1000; // 8 jam
+
+    function cekPinSudahLogin() {
+      try {
+        const auth = localStorage.getItem(PIN_KEY);
+        if (!auth) return false;
+        const { time } = JSON.parse(auth);
+        if (Date.now() - time > PIN_EXPIRE) {
+          localStorage.removeItem(PIN_KEY);
+          return false;
+        }
+        return true;
+      } catch(e) { return false; }
+    }
+
+    function cekPin() {
+      const input = document.getElementById('pin-input');
+      const errorEl = document.getElementById('pin-error');
+      const pin = input.value.trim();
+
+      if (pin === SCANNER_PIN) {
+        localStorage.setItem(PIN_KEY, JSON.stringify({ time: Date.now() }));
+        document.getElementById('pin-screen').style.display = 'none';
+        errorEl.style.display = 'none';
+        input.value = '';
+        loadRiwayat();
+        document.getElementById('nisn-input').focus();
+      } else {
+        input.classList.add('error');
+        errorEl.style.display = 'block';
+        input.value = '';
+        setTimeout(() => {
+          input.classList.remove('error');
+          input.focus();
+        }, 400);
+      }
+    }
+
+    // Cek saat halaman dibuka
+    if (cekPinSudahLogin()) {
+      document.getElementById('pin-screen').style.display = 'none';
+    } else {
+      document.getElementById('pin-screen').style.display = 'flex';
+      setTimeout(() => document.getElementById('pin-input').focus(), 300);
+    }
+
+    window.cekPin = cekPin;
+
 
     // ==========================================
     // JAM REALTIME
