@@ -989,7 +989,7 @@
     // KEYBOARD SUPPORT
     // ==========================================
     document.getElementById('nisn-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') prosesPresensi();
+      if (e.key === 'Enter') prosesPresensi(false);
     });
 
     // ==========================================
@@ -997,6 +997,8 @@
     // ==========================================
     window.prosesPresensi = prosesPresensi;
     window.loadRiwayat = loadRiwayat;
+    window.showKonfirmasiPulang = showKonfirmasiPulang;
+    window.cekPin = cekPin;
 
     // ==========================================
     // INIT
