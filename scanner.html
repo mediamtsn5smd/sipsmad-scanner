@@ -676,7 +676,9 @@
 
     function getTimeString() {
       const now = new Date();
-      return now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      return h + ':' + m;
     }
 
     function showResult(type, emoji, nama, msg, badgeText, badgeClass) {
