@@ -767,13 +767,13 @@
           batasTelat = s.batas_telat || '07:30';
         }
 
-        const taQuery = await getDocs(
-          query(collection(db, 'tahun_ajaran'), where('status', '==', 'AKTIF'))
-        );
-        let id_tahun_ajaran = '';
-        if (!taQuery.empty) {
-          id_tahun_ajaran = taQuery.docs[0].id;
-        }
+        // const taQuery = await getDocs(
+        //   query(collection(db, 'tahun_ajaran'), where('status', '==', 'AKTIF'))
+        // );
+        // let id_tahun_ajaran = '';
+        // if (!taQuery.empty) {
+        //   id_tahun_ajaran = taQuery.docs[0].id;
+        // }
 
         if (presensiSnap.empty) {
           // PRESENSI MASUK
@@ -782,7 +782,7 @@
             tanggal: today,
             nisn: nisn,
             id_kelas: siswa.id_kelas || '',
-            id_tahun_ajaran : id_tahun_ajaran,  // ← tambah
+            // id_tahun_ajaran : id_tahun_ajaran,  // ← tambah
             jam_masuk: nowTime,
             jam_keluar: '',
             status: status,
