@@ -597,6 +597,22 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    // Cache tahun ajaran aktif — load sekali saat halaman dibuka
+    let _idTahunAjaran = '';
+    
+    async function loadTahunAjaranAktif() {
+      try {
+        const taQuery = await getDocs(
+          query(collection(db, 'tahun_ajaran'), where('status', '==', 'AKTIF'))
+        );
+        if (!taQuery.empty) {
+          _idTahunAjaran = taQuery.docs[0].id;
+          console.log('Tahun ajaran aktif:', _idTahunAjaran);
+        }
+      } catch(e) {
+        console.error('Gagal load tahun ajaran:', e);
+      }
+    }
 
     // ==========================================
     // PIN PROTECTION
@@ -766,15 +782,8 @@
           const s = settingsSnap.docs[0].data();
           batasTelat = s.batas_telat || '07:30';
         }
-
-        // const taQuery = await getDocs(
-        //   query(collection(db, 'tahun_ajaran'), where('status', '==', 'AKTIF'))
-        // );
-        // let id_tahun_ajaran = '';
-        // if (!taQuery.empty) {
-        //   id_tahun_ajaran = taQuery.docs[0].id;
-        // }
-
+        
+        const id_tahun_ajaran = _idTahunAjaran; // ← dari cache
         if (presensiSnap.empty) {
           // PRESENSI MASUK
           const status = nowTime <= batasTelat ? 'HADIR' : 'TERLAMBAT';
@@ -782,7 +791,7 @@
             tanggal: today,
             nisn: nisn,
             id_kelas: siswa.id_kelas || '',
-            // id_tahun_ajaran : id_tahun_ajaran,  // ← tambah
+            id_tahun_ajaran : id_tahun_ajaran,  // ← tambah
             jam_masuk: nowTime,
             jam_keluar: '',
             status: status,
@@ -1014,6 +1023,7 @@
     // ==========================================
     // INIT
     // ==========================================
+    loadTahunAjaranAktif();
     loadRiwayat();
     // Auto refresh riwayat setiap 30 detik
     setInterval(loadRiwayat, 30000);
