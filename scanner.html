@@ -731,14 +731,6 @@
     async function prosesPresensi(konfirmasiPulang = false) {
       const nisn = document.getElementById('nisn-input').value.trim();
       if (!nisn) return;
-      if (!_idTahunAjaran) {
-        await loadTahunAjaranAktif();
-        if (!_idTahunAjaran) {
-          showResult('error', '❌', 'Error', 'Tahun ajaran aktif tidak ditemukan. Hubungi admin.', null, null);
-          document.getElementById('nisn-input').value = '';
-          return;
-        }
-      }
 
       const btn = document.getElementById('scan-btn');
       btn.disabled = true;
@@ -763,7 +755,6 @@
           collection(db, 'users'),
           where('username', '==', nisn),
           where('role', '==', 'siswa')
-          where('id_tahun_ajaran', '==', _idTahunAjaran)  // ← tambah filter ini
         );
         const userSnap = await getDocs(userQuery);
 
