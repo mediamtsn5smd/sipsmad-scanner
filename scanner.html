@@ -466,7 +466,6 @@
       margin-top: 10px;
       display: none;
     }
-
   </style>
 </head>
 <body>
@@ -484,9 +483,8 @@
       <input type="password" id="pin-input" class="pin-input"
         placeholder="••••"
         maxlength="6"
-        inputmode="numeric"
-        onkeydown="if(event.key==='Enter') cekPin()">
-      <button class="pin-btn" onclick="cekPin()">🔓 Masuk</button>
+        inputmode="numeric">
+      <button class="pin-btn" id="pin-login-btn">🔓 Masuk</button>
       <p class="pin-error" id="pin-error">❌ PIN salah. Coba lagi.</p>
       <p style="font-size:11px;color:#cbd5e1;margin-top:16px;">Hubungi admin jika lupa PIN</p>
     </div>
@@ -538,7 +536,7 @@
           placeholder="Ketik atau scan NISN..."
           autocomplete="off"
           autofocus>
-        <button class="scan-btn" id="scan-btn" onclick="prosesPresensi()">
+        <button class="scan-btn" id="scan-btn">
           <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
           </svg>
@@ -560,7 +558,7 @@
     <!-- Riwayat -->
     <div class="section-title">
       📋 Riwayat Scan Hari Ini
-      <button class="refresh-btn" onclick="loadRiwayat()" title="Refresh">
+      <button class="refresh-btn" id="refresh-btn" title="Refresh">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
         </svg>
@@ -597,6 +595,7 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    
     // Cache tahun ajaran aktif — load sekali saat halaman dibuka
     let _idTahunAjaran = '';
     
@@ -657,17 +656,6 @@
       }
     }
 
-    // Cek saat halaman dibuka
-    if (cekPinSudahLogin()) {
-      document.getElementById('pin-screen').style.display = 'none';
-    } else {
-      document.getElementById('pin-screen').style.display = 'flex';
-      setTimeout(() => document.getElementById('pin-input').focus(), 300);
-    }
-
-    window.cekPin = cekPin;
-
-
     // ==========================================
     // JAM REALTIME
     // ==========================================
@@ -676,9 +664,7 @@
       document.getElementById('jam-sekarang').innerText =
         now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     }
-    updateJam();
-    setInterval(updateJam, 1000);
-
+    
     // ==========================================
     // UTILITY
     // ==========================================
@@ -721,7 +707,9 @@
 
       // Auto hide setelah 4 detik
       setTimeout(() => {
-        card.style.display = 'none';
+        if (card.style.display !== 'none') {
+          card.style.display = 'none';
+        }
       }, 4000);
     }
 
@@ -791,7 +779,7 @@
             tanggal: today,
             nisn: nisn,
             id_kelas: siswa.id_kelas || '',
-            id_tahun_ajaran : id_tahun_ajaran,  // ← tambah
+            id_tahun_ajaran : id_tahun_ajaran,
             jam_masuk: nowTime,
             jam_keluar: '',
             status: status,
@@ -823,7 +811,8 @@
             if (!konfirmasiPulang && selisihMenit < 60) {
               card.style.display = 'none';
               btn.disabled = false;
-              btn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Proses`;
+              btn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          <span class="btn-text">Proses</span>`;
               const nisnSementara = nisn;
               document.getElementById('nisn-input').value = '';
               showKonfirmasiPulang(siswa.nama, presensiData.jam_masuk, selisihMenit, nisnSementara);
@@ -845,11 +834,10 @@
         showResult('error', '❌', 'Error', 'Gagal terhubung ke server. Cek koneksi internet.', null, null);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = `
-          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+        btn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
           </svg>
-          Proses`;
+          <span class="btn-text">Proses</span>`;
         document.getElementById('nisn-input').value = '';
         document.getElementById('nisn-input').focus();
       }
@@ -1006,28 +994,42 @@
     }
 
     // ==========================================
-    // KEYBOARD SUPPORT
+    // INITIALIZATION
     // ==========================================
-    document.getElementById('nisn-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') prosesPresensi(false);
-    });
+    function init() {
+      // Cek PIN saat halaman dibuka
+      if (cekPinSudahLogin()) {
+        document.getElementById('pin-screen').style.display = 'none';
+      } else {
+        document.getElementById('pin-screen').style.display = 'flex';
+        setTimeout(() => document.getElementById('pin-input').focus(), 300);
+      }
 
-    // ==========================================
-    // EXPOSE KE GLOBAL (untuk onclick di HTML)
-    // ==========================================
-    window.prosesPresensi = prosesPresensi;
-    window.loadRiwayat = loadRiwayat;
-    window.showKonfirmasiPulang = showKonfirmasiPulang;
-    window.cekPin = cekPin;
+      // Setup event listeners
+      updateJam();
+      setInterval(updateJam, 1000);
+      
+      document.getElementById('pin-login-btn').addEventListener('click', cekPin);
+      document.getElementById('pin-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') cekPin();
+      });
+      
+      document.getElementById('scan-btn').addEventListener('click', () => prosesPresensi(false));
+      document.getElementById('nisn-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') prosesPresensi(false);
+      });
+      document.getElementById('refresh-btn').addEventListener('click', loadRiwayat);
+      
+      // Load data awal
+      loadTahunAjaranAktif();
+      loadRiwayat();
+      
+      // Auto refresh riwayat setiap 30 detik
+      setInterval(loadRiwayat, 30000);
+    }
 
-    // ==========================================
-    // INIT
-    // ==========================================
-    loadTahunAjaranAktif();
-    loadRiwayat();
-    // Auto refresh riwayat setiap 30 detik
-    setInterval(loadRiwayat, 30000);
-
+    // Start the app
+    init();
   </script>
 </body>
 </html>
