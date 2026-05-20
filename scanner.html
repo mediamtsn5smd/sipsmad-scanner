@@ -2,9 +2,11 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
   <title>SIPSMAD — Scanner Presensi</title>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- html5-qrcode untuk scanner kamera -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -18,6 +20,8 @@
       --red-light: #fee2e2;
       --yellow: #ca8a04;
       --yellow-light: #fef9c3;
+      --purple: #7c3aed;
+      --purple-light: #ede9fe;
       --slate-50: #f8fafc;
       --slate-100: #f1f5f9;
       --slate-200: #e2e8f0;
@@ -87,6 +91,39 @@
       padding: 20px 16px 40px;
     }
 
+    /* Mode Toggle */
+    .mode-toggle {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      background: white;
+      border-radius: 16px;
+      padding: 4px;
+      border: 1px solid var(--slate-200);
+    }
+    .mode-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      background: transparent;
+      border: none;
+      font-family: inherit;
+      color: var(--slate-500);
+    }
+    .mode-btn.active {
+      background: var(--blue);
+      color: white;
+    }
+    .mode-btn.scan-active {
+      background: var(--purple);
+      color: white;
+    }
+
     /* Input Card */
     .input-card {
       background: white;
@@ -111,6 +148,7 @@
       display: flex;
       gap: 8px;
       align-items: stretch;
+      flex-wrap: wrap;
     }
 
     .nisn-input {
@@ -160,15 +198,56 @@
       flex-shrink: 0;
     }
 
+    .qr-btn {
+      background: var(--purple);
+    }
+    .qr-btn:hover { background: #6d28d9; }
+
     .scan-btn svg { flex-shrink: 0; }
     .scan-btn:hover { background: var(--blue-dark); }
     .scan-btn:active { transform: scale(0.97); }
     .scan-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
-    @media (max-width: 380px) {
-      .scan-btn .btn-text { display: none; }
-      .scan-btn { padding: 12px 14px; }
-      .nisn-input { font-size: 15px; }
+    /* Scanner Container */
+    .scanner-container {
+      background: white;
+      border-radius: 20px;
+      border: 1px solid var(--slate-200);
+      padding: 16px;
+      margin-bottom: 16px;
+      display: none;
+      overflow: hidden;
+    }
+    .scanner-container.active {
+      display: block;
+      animation: slideUp 0.3s ease;
+    }
+    #qr-reader {
+      width: 100%;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    #qr-reader video {
+      border-radius: 12px;
+      width: 100%;
+    }
+    .btn-stop-scan {
+      margin-top: 12px;
+      width: 100%;
+      background: var(--red);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-stop-scan:hover { background: #b91c1c; }
+
+    @media (max-width: 480px) {
+      .input-row { flex-wrap: wrap; }
+      .scan-btn { flex: 1; }
     }
 
     .hint {
@@ -365,19 +444,17 @@
       background: white;
     }
 
-    /* Pulse animation untuk input saat scan berhasil */
+    /* Pulse animation */
     @keyframes flashGreen {
       0%, 100% { border-color: var(--slate-200); }
       50% { border-color: var(--green); box-shadow: 0 0 0 3px rgba(22,163,74,0.15); }
     }
-
     .flash-success { animation: flashGreen 0.6s ease; }
 
     @keyframes flashRed {
       0%, 100% { border-color: var(--slate-200); }
       50% { border-color: var(--red); box-shadow: 0 0 0 3px rgba(220,38,38,0.15); }
     }
-
     .flash-error { animation: flashRed 0.6s ease; }
 
     /* PIN Screen */
@@ -431,11 +508,7 @@
     }
 
     .pin-input:focus { border-color: var(--blue); }
-
-    .pin-input.error {
-      border-color: var(--red);
-      animation: shake 0.3s ease;
-    }
+    .pin-input.error { border-color: var(--red); animation: shake 0.3s ease; }
 
     @keyframes shake {
       0%, 100% { transform: translateX(0); }
@@ -456,16 +529,8 @@
       font-family: inherit;
       transition: background 0.2s;
     }
-
     .pin-btn:hover { background: var(--blue-dark); }
-
-    .pin-error {
-      color: var(--red);
-      font-size: 12px;
-      font-weight: 600;
-      margin-top: 10px;
-      display: none;
-    }
+    .pin-error { color: var(--red); font-size: 12px; font-weight: 600; margin-top: 10px; display: none; }
   </style>
 </head>
 <body>
@@ -480,10 +545,7 @@
       </div>
       <h2 style="font-size:20px;font-weight:800;color:#1e293b;margin:0 0 4px;">SIPSMAD Scanner</h2>
       <p style="font-size:13px;color:#94a3b8;margin:0;">Masukkan PIN untuk melanjutkan</p>
-      <input type="password" id="pin-input" class="pin-input"
-        placeholder="••••"
-        maxlength="6"
-        inputmode="numeric">
+      <input type="password" id="pin-input" class="pin-input" placeholder="••••" maxlength="6" inputmode="numeric">
       <button class="pin-btn" id="pin-login-btn">🔓 Masuk</button>
       <p class="pin-error" id="pin-error">❌ PIN salah. Coba lagi.</p>
       <p style="font-size:11px;color:#cbd5e1;margin-top:16px;">Hubungi admin jika lupa PIN</p>
@@ -509,41 +571,51 @@
   <!-- Main -->
   <main class="main">
 
-    <!-- Stats Hari Ini -->
-    <div class="stats-bar">
-      <div class="stat-item">
-        <div class="stat-num" id="stat-masuk" style="color:#16a34a">0</div>
-        <div class="stat-label">Masuk</div>
+    <!-- Mode Toggle -->
+    <div class="mode-toggle" id="mode-toggle">
+      <button class="mode-btn active" id="mode-manual" onclick="setMode('manual')">⌨️ Manual NISN</button>
+      <button class="mode-btn" id="mode-scan" onclick="setMode('scan')">📷 Scan QR Code</button>
+    </div>
+
+    <!-- Manual Input Mode -->
+    <div id="manual-mode">
+      <div class="stats-bar">
+        <div class="stat-item">
+          <div class="stat-num" id="stat-masuk" style="color:#16a34a">0</div>
+          <div class="stat-label">Masuk</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num" id="stat-pulang" style="color:#2563eb">0</div>
+          <div class="stat-label">Pulang</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num" id="stat-terlambat" style="color:#ca8a04">0</div>
+          <div class="stat-label">Terlambat</div>
+        </div>
       </div>
-      <div class="stat-item">
-        <div class="stat-num" id="stat-pulang" style="color:#2563eb">0</div>
-        <div class="stat-label">Pulang</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-num" id="stat-terlambat" style="color:#ca8a04">0</div>
-        <div class="stat-label">Terlambat</div>
+
+      <div class="input-card">
+        <span class="input-label">Input NISN Siswa</span>
+        <div class="input-row">
+          <input type="text" id="nisn-input" class="nisn-input" placeholder="Ketik atau scan NISN..." autocomplete="off" autofocus>
+          <button class="scan-btn" id="scan-btn">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span class="btn-text">Proses</span>
+          </button>
+        </div>
+        <p class="hint">Tekan <kbd>Enter</kbd> untuk memproses · Scanner barcode USB/Bluetooth langsung berfungsi</p>
       </div>
     </div>
 
-    <!-- Input NISN -->
-    <div class="input-card">
-      <span class="input-label">Input NISN Siswa</span>
-      <div class="input-row">
-        <input
-          type="text"
-          id="nisn-input"
-          class="nisn-input"
-          placeholder="Ketik atau scan NISN..."
-          autocomplete="off"
-          autofocus>
-        <button class="scan-btn" id="scan-btn">
-          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-          </svg>
-          <span class="btn-text">Proses</span>
-        </button>
+    <!-- QR Scanner Mode -->
+    <div id="scan-mode" style="display:none;">
+      <div class="scanner-container" id="scanner-container">
+        <div id="qr-reader"></div>
+        <button class="btn-stop-scan" id="stop-scan-btn" onclick="stopScanner()">⏹️ Hentikan Scan</button>
+        <p class="hint" style="margin-top:12px;">Arahkan kamera ke QR Code siswa. Scan akan otomatis memproses presensi.</p>
       </div>
-      <p class="hint">Tekan <kbd>Enter</kbd> untuk memproses · Scanner barcode USB/Bluetooth langsung berfungsi</p>
     </div>
 
     <!-- Result -->
@@ -579,11 +651,9 @@
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, addDoc, doc, updateDoc, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs, addDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    // ==========================================
-    // KONFIGURASI FIREBASE — GANTI SESUAI PROJECT ANDA
-    // ==========================================
+    // Konfigurasi Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyC4jQVq8bWasbOPoqVpJsQpj29PngqZXEE",
       authDomain: "sipsmad-4c059.firebaseapp.com",
@@ -596,29 +666,21 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     
-    // Cache tahun ajaran aktif — load sekali saat halaman dibuka
     let _idTahunAjaran = '';
+    let html5QrCodeScanner = null;
+    let isScanning = false;
     
     async function loadTahunAjaranAktif() {
       try {
-        const taQuery = await getDocs(
-          query(collection(db, 'tahun_ajaran'), where('status', '==', 'AKTIF'))
-        );
-        if (!taQuery.empty) {
-          _idTahunAjaran = taQuery.docs[0].id;
-          console.log('Tahun ajaran aktif:', _idTahunAjaran);
-        }
-      } catch(e) {
-        console.error('Gagal load tahun ajaran:', e);
-      }
+        const taQuery = await getDocs(query(collection(db, 'tahun_ajaran'), where('status', '==', 'AKTIF')));
+        if (!taQuery.empty) _idTahunAjaran = taQuery.docs[0].id;
+      } catch(e) { console.error(e); }
     }
 
-    // ==========================================
     // PIN PROTECTION
-    // ==========================================
-    const SCANNER_PIN = '1007'; // ← GANTI dengan PIN sekolah Anda
+    const SCANNER_PIN = '1007';
     const PIN_KEY = 'sipsmad_scanner_auth';
-    const PIN_EXPIRE = 8 * 60 * 60 * 1000; // 8 jam
+    const PIN_EXPIRE = 8 * 60 * 60 * 1000;
 
     function cekPinSudahLogin() {
       try {
@@ -637,7 +699,6 @@
       const input = document.getElementById('pin-input');
       const errorEl = document.getElementById('pin-error');
       const pin = input.value.trim();
-
       if (pin === SCANNER_PIN) {
         localStorage.setItem(PIN_KEY, JSON.stringify({ time: Date.now() }));
         document.getElementById('pin-screen').style.display = 'none';
@@ -649,82 +710,155 @@
         input.classList.add('error');
         errorEl.style.display = 'block';
         input.value = '';
-        setTimeout(() => {
-          input.classList.remove('error');
-          input.focus();
-        }, 400);
+        setTimeout(() => { input.classList.remove('error'); input.focus(); }, 400);
       }
     }
 
-    // ==========================================
-    // JAM REALTIME
-    // ==========================================
-    function updateJam() {
-      const now = new Date();
-      document.getElementById('jam-sekarang').innerText =
-        now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    }
-    
-    // ==========================================
-    // UTILITY
-    // ==========================================
-    function getTodayString() {
-      const now = new Date();
-      const y = now.getFullYear();
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      const d = String(now.getDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
+    window.cekPin = cekPin;
+
+    // Mode Toggle
+    window.setMode = function(mode) {
+      const manualMode = document.getElementById('manual-mode');
+      const scanMode = document.getElementById('scan-mode');
+      const manualBtn = document.getElementById('mode-manual');
+      const scanBtn = document.getElementById('mode-scan');
+      
+      if (mode === 'manual') {
+        manualMode.style.display = 'block';
+        scanMode.style.display = 'none';
+        manualBtn.classList.add('active');
+        scanBtn.classList.remove('active', 'scan-active');
+        stopScanner();
+        document.getElementById('nisn-input').focus();
+      } else {
+        manualMode.style.display = 'none';
+        scanMode.style.display = 'block';
+        manualBtn.classList.remove('active');
+        scanBtn.classList.add('active', 'scan-active');
+        startScanner();
+      }
+    };
+
+    // Start QR Scanner
+    async function startScanner() {
+      if (html5QrCodeScanner) {
+        await stopScanner();
+      }
+      
+      const scannerContainer = document.getElementById('scanner-container');
+      scannerContainer.classList.add('active');
+      
+      html5QrCodeScanner = new Html5Qrcode("qr-reader");
+      
+      try {
+        await html5QrCodeScanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          onScanSuccess,
+          onScanError
+        );
+        isScanning = true;
+      } catch (err) {
+        console.error("Gagal memulai kamera:", err);
+        showToast("Tidak dapat mengakses kamera. Pastikan izin kamera diberikan.", "error");
+      }
     }
 
+    window.stopScanner = async function() {
+      if (html5QrCodeScanner && isScanning) {
+        try {
+          await html5QrCodeScanner.stop();
+          await html5QrCodeScanner.clear();
+          isScanning = false;
+        } catch(e) { console.error(e); }
+        html5QrCodeScanner = null;
+      }
+    };
+
+    let isProcessing = false;
+
+    async function onScanSuccess(decodedText) {
+      if (isProcessing) return;
+      isProcessing = true;
+      
+      try { new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg').play(); } catch(e) {}
+      
+      showToast(`QR Terbaca: ${decodedText}`, 'info');
+      
+      // Isi NISN ke input dan proses presensi
+      const nisnInput = document.getElementById('nisn-input');
+      nisnInput.value = decodedText;
+      
+      // Proses presensi langsung
+      await prosesPresensi(false);
+      
+      setTimeout(() => { isProcessing = false; }, 2000);
+    }
+
+    function onScanError(error) {
+      // Tidak perlu log setiap error
+    }
+
+    function showToast(message, type = 'success') {
+      const resultCard = document.getElementById('result-card');
+      resultCard.className = `result-card ${type === 'error' ? 'error' : 'success'}`;
+      resultCard.style.display = 'block';
+      document.getElementById('result-emoji').innerText = type === 'error' ? '❌' : 'ℹ️';
+      document.getElementById('result-name').innerText = type === 'error' ? 'Error' : 'Info';
+      document.getElementById('result-msg').innerText = message;
+      document.getElementById('result-time').innerText = new Date().toLocaleTimeString('id-ID');
+      setTimeout(() => { resultCard.style.display = 'none'; }, 3000);
+    }
+
+    // Jam Realtime
+    function updateJam() {
+      const now = new Date();
+      document.getElementById('jam-sekarang').innerText = now.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    }
+    updateJam();
+    setInterval(updateJam, 1000);
+
+    // Utility
+    function getTodayString() {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    }
     function getTimeString() {
       const now = new Date();
-      const h = String(now.getHours()).padStart(2, '0');
-      const m = String(now.getMinutes()).padStart(2, '0');
-      return h + ':' + m;
+      return `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
     }
 
     function showResult(type, emoji, nama, msg, badgeText, badgeClass) {
       const card = document.getElementById('result-card');
       const input = document.getElementById('nisn-input');
-
       card.className = `result-card ${type}`;
       card.style.display = 'block';
       document.getElementById('result-emoji').innerText = emoji;
       document.getElementById('result-name').innerText = nama;
       document.getElementById('result-msg').innerText = msg;
       document.getElementById('result-time').innerText = new Date().toLocaleTimeString('id-ID');
-
       const badge = document.getElementById('result-badge');
-      if (badgeText) {
-        badge.innerHTML = `<span class="status-badge ${badgeClass}">${badgeText}</span>`;
-      } else {
-        badge.innerHTML = '';
-      }
-
-      // Flash input
+      if (badgeText) badge.innerHTML = `<span class="status-badge ${badgeClass}">${badgeText}</span>`;
+      else badge.innerHTML = '';
       input.classList.add(type === 'success' ? 'flash-success' : 'flash-error');
       setTimeout(() => input.classList.remove('flash-success', 'flash-error'), 600);
-
-      // Auto hide setelah 4 detik
-      setTimeout(() => {
-        if (card.style.display !== 'none') {
-          card.style.display = 'none';
-        }
-      }, 4000);
+      setTimeout(() => { if (card.style.display !== 'none') card.style.display = 'none'; }, 4000);
     }
 
-    // ==========================================
-    // PROSES PRESENSI — LANGSUNG KE FIRESTORE
-    // ==========================================
+    // Proses Presensi
     async function prosesPresensi(konfirmasiPulang = false) {
       const nisn = document.getElementById('nisn-input').value.trim();
-      if (!nisn) return;
+      if (!nisn) {
+        showToast('NISN tidak boleh kosong', 'error');
+        return;
+      }
 
       const btn = document.getElementById('scan-btn');
-      btn.disabled = true;
-      btn.innerHTML = '<div class="spinner"></div>';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner"></div>';
+      }
 
-      // Tampilkan processing
       const card = document.getElementById('result-card');
       card.className = 'result-card processing';
       card.style.display = 'block';
@@ -738,114 +872,75 @@
         const today = getTodayString();
         const nowTime = getTimeString();
 
-        // 1. Cari siswa by NISN (username)
-        const userQuery = query(
-          collection(db, 'users'),
-          where('username', '==', nisn),
-          where('role', '==', 'siswa')
-        );
+        // Cari siswa
+        const userQuery = query(collection(db, 'users'), where('username', '==', nisn), where('role', '==', 'siswa'));
         const userSnap = await getDocs(userQuery);
-
         if (userSnap.empty) {
-          showResult('error', '❌', 'Tidak Ditemukan', `NISN "${nisn}" tidak terdaftar dalam sistem.`, null, null);
+          showResult('error', '❌', 'Tidak Ditemukan', `NISN "${nisn}" tidak terdaftar.`, null, null);
           document.getElementById('nisn-input').value = '';
           return;
         }
+        const siswa = { _id: userSnap.docs[0].id, ...userSnap.docs[0].data() };
 
-        const siswaDoc = userSnap.docs[0];
-        const siswa = { _id: siswaDoc.id, ...siswaDoc.data() };
-
-        // 2. Cari presensi hari ini
-        const presensiQuery = query(
-          collection(db, 'presensi'),
-          where('nisn', '==', nisn),
-          where('tanggal', '==', today)
-        );
+        // Cek presensi hari ini
+        const presensiQuery = query(collection(db, 'presensi'), where('nisn', '==', nisn), where('tanggal', '==', today));
         const presensiSnap = await getDocs(presensiQuery);
 
-        // 3. Ambil settings
+        // Ambil settings
         const settingsSnap = await getDocs(collection(db, 'settings'));
         let batasTelat = '07:30';
-        if (!settingsSnap.empty) {
-          const s = settingsSnap.docs[0].data();
-          batasTelat = s.batas_telat || '07:30';
-        }
-        
-        const id_tahun_ajaran = _idTahunAjaran; // ← dari cache
+        if (!settingsSnap.empty) batasTelat = settingsSnap.docs[0].data().batas_telat || '07:30';
+
         if (presensiSnap.empty) {
-          // PRESENSI MASUK
           const status = nowTime <= batasTelat ? 'HADIR' : 'TERLAMBAT';
           await addDoc(collection(db, 'presensi'), {
-            tanggal: today,
-            nisn: nisn,
-            id_kelas: siswa.id_kelas || '',
-            id_tahun_ajaran : id_tahun_ajaran,
-            jam_masuk: nowTime,
-            jam_keluar: '',
-            status: status,
-            validasi_guru: 'Sistem',
-            keterangan: ''
+            tanggal: today, nisn: nisn, id_kelas: siswa.id_kelas || '', id_tahun_ajaran: _idTahunAjaran,
+            jam_masuk: nowTime, jam_keluar: '', status: status, validasi_guru: 'Sistem', keterangan: ''
           });
-
-          const emoji = status === 'HADIR' ? '✅' : '⏰';
-          const badgeClass = status === 'HADIR' ? 'badge-hadir' : 'badge-terlambat';
-          showResult('success', emoji, siswa.nama, `Presensi Masuk · ${nowTime}`, status, badgeClass);
+          showResult('success', status === 'HADIR' ? '✅' : '⏰', siswa.nama, `Presensi Masuk · ${nowTime}`, status, status === 'HADIR' ? 'badge-hadir' : 'badge-terlambat');
           updateStats(status === 'TERLAMBAT' ? 'terlambat' : 'masuk');
-
         } else {
-          // PRESENSI PULANG
           const presensiDoc = presensiSnap.docs[0];
           const presensiData = presensiDoc.data();
-
           if (presensiData.jam_keluar && presensiData.jam_keluar !== '') {
             showResult('warning', '⚠️', siswa.nama, 'Sudah melakukan presensi pulang hari ini.', null, null);
           } else {
-            // Hitung selisih waktu masuk dan sekarang
             const jamMasukParts = presensiData.jam_masuk.split(':');
             const nowParts = nowTime.split(':');
-            const menitMasuk = parseInt(jamMasukParts[0]) * 60 + parseInt(jamMasukParts[1]);
-            const menitNow = parseInt(nowParts[0]) * 60 + parseInt(nowParts[1]);
+            const menitMasuk = parseInt(jamMasukParts[0])*60 + parseInt(jamMasukParts[1]);
+            const menitNow = parseInt(nowParts[0])*60 + parseInt(nowParts[1]);
             const selisihMenit = menitNow - menitMasuk;
-
-            // Jika belum konfirmasi DAN selisih < 60 menit → tampilkan konfirmasi
             if (!konfirmasiPulang && selisihMenit < 60) {
               card.style.display = 'none';
-              btn.disabled = false;
-              btn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-          <span class="btn-text">Proses</span>`;
-              const nisnSementara = nisn;
+              if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Proses`;
+              }
               document.getElementById('nisn-input').value = '';
-              showKonfirmasiPulang(siswa.nama, presensiData.jam_masuk, selisihMenit, nisnSementara);
+              showKonfirmasiPulang(siswa.nama, presensiData.jam_masuk, selisihMenit, nisn);
               return;
             }
-
-            // Selisih > 60 menit atau sudah konfirmasi → langsung pulang
             await updateDoc(doc(db, 'presensi', presensiDoc.id), { jam_keluar: nowTime });
             showResult('success', '🏠', siswa.nama, `Presensi Pulang · ${nowTime}`, 'PULANG', 'badge-pulang');
             updateStats('pulang');
           }
         }
-
-        // Refresh riwayat
         await loadRiwayat();
-
       } catch(e) {
         console.error(e);
-        showResult('error', '❌', 'Error', 'Gagal terhubung ke server. Cek koneksi internet.', null, null);
+        showResult('error', '❌', 'Error', 'Gagal terhubung ke server.', null, null);
       } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-          </svg>
-          <span class="btn-text">Proses</span>`;
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Proses`;
+        }
         document.getElementById('nisn-input').value = '';
         document.getElementById('nisn-input').focus();
       }
     }
 
-    // ==========================================
-    // KONFIRMASI PULANG
-    // ==========================================
+    window.prosesPresensi = prosesPresensi;
+
     function showKonfirmasiPulang(nama, jamMasuk, selisihMenit, nisn) {
       const overlay = document.createElement('div');
       overlay.id = 'overlay-konfirmasi-pulang';
@@ -859,46 +954,29 @@
           <div style="padding:20px;">
             <div style="background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center;">
               <p style="font-weight:800;color:#1e293b;font-size:18px;margin:0 0 6px;">${nama}</p>
-              <p style="font-size:13px;color:#64748b;margin:0 0 4px;">
-                Sudah presensi masuk pukul <strong style="color:#2563eb;">${jamMasuk}</strong>
-              </p>
-              <p style="font-size:12px;color:#d97706;font-weight:700;margin:0;">
-                ⏱ Baru ${selisihMenit} menit yang lalu
-              </p>
+              <p style="font-size:13px;color:#64748b;margin:0 0 4px;">Sudah presensi masuk pukul <strong style="color:#2563eb;">${jamMasuk}</strong></p>
+              <p style="font-size:12px;color:#d97706;font-weight:700;margin:0;">⏱ Baru ${selisihMenit} menit yang lalu</p>
             </div>
-            <p style="font-size:13px;color:#64748b;text-align:center;margin:0 0 16px;">
-              Apakah ini <strong>presensi pulang</strong>?
-            </p>
+            <p style="font-size:13px;color:#64748b;text-align:center;margin:0 0 16px;">Apakah ini <strong>presensi pulang</strong>?</p>
             <div style="display:flex;gap:10px;">
-              <button id="btn-batal-pulang"
-                style="flex:1;background:#f1f5f9;color:#475569;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">
-                ❌ Batal
-              </button>
-              <button id="btn-ya-pulang"
-                style="flex:1;background:#2563eb;color:white;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">
-                🏠 Ya, Pulang
-              </button>
+              <button id="btn-batal-pulang" style="flex:1;background:#f1f5f9;color:#475569;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;">❌ Batal</button>
+              <button id="btn-ya-pulang" style="flex:1;background:#2563eb;color:white;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;">🏠 Ya, Pulang</button>
             </div>
           </div>
         </div>
       `;
       document.body.appendChild(overlay);
-
       document.getElementById('btn-batal-pulang').onclick = () => {
         overlay.remove();
         document.getElementById('nisn-input').focus();
       };
-
       document.getElementById('btn-ya-pulang').onclick = () => {
         overlay.remove();
         document.getElementById('nisn-input').value = nisn;
-        prosesPresensi(true); // konfirmasiPulang = true
+        prosesPresensi(true);
       };
     }
 
-    // ==========================================
-    // UPDATE STATS COUNTER
-    // ==========================================
     function updateStats(type) {
       if (type === 'masuk') {
         const el = document.getElementById('stat-masuk');
@@ -914,54 +992,29 @@
       }
     }
 
-    // ==========================================
-    // LOAD RIWAYAT SCAN HARI INI
-    // ==========================================
     async function loadRiwayat() {
       const listEl = document.getElementById('riwayat-list');
       try {
         const today = getTodayString();
-        const q = query(
-          collection(db, 'presensi'),
-          where('tanggal', '==', today)
-        );
+        const q = query(collection(db, 'presensi'), where('tanggal', '==', today));
         const snap = await getDocs(q);
-
         if (snap.empty) {
           listEl.innerHTML = '<div class="empty-state">Belum ada scan hari ini</div>';
-          // Reset stats
           document.getElementById('stat-masuk').innerText = '0';
           document.getElementById('stat-pulang').innerText = '0';
           document.getElementById('stat-terlambat').innerText = '0';
           return;
         }
-
-        // Ambil semua data presensi
         const presensiList = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-
-        // Ambil nama siswa
         const userSnap = await getDocs(collection(db, 'users'));
         const userMap = {};
-        userSnap.docs.forEach(d => {
-          const u = d.data();
-          userMap[u.username] = u.nama;
-        });
-
-        // Hitung stats
+        userSnap.docs.forEach(d => { const u = d.data(); userMap[u.username] = u.nama; });
         let masuk = 0, pulang = 0, terlambat = 0;
-        presensiList.forEach(p => {
-          masuk++;
-          if (p.jam_keluar && p.jam_keluar !== '') pulang++;
-          if (p.status === 'TERLAMBAT') terlambat++;
-        });
-
+        presensiList.forEach(p => { masuk++; if (p.jam_keluar && p.jam_keluar !== '') pulang++; if (p.status === 'TERLAMBAT') terlambat++; });
         document.getElementById('stat-masuk').innerText = masuk;
         document.getElementById('stat-pulang').innerText = pulang;
         document.getElementById('stat-terlambat').innerText = terlambat;
-
-        // Render list — terbaru di atas
         const sorted = presensiList.sort((a, b) => b.jam_masuk > a.jam_masuk ? 1 : -1);
-
         listEl.innerHTML = sorted.slice(0, 20).map(p => {
           const nama = userMap[p.nisn] || p.nisn;
           const inisial = nama.charAt(0).toUpperCase();
@@ -971,64 +1024,24 @@
           else if (p.status === 'SAKIT') badgeColor = 'background:#dbeafe;color:#2563eb';
           else if (p.status === 'ALPA') badgeColor = 'background:#fee2e2;color:#dc2626';
           else badgeColor = 'background:#f1f5f9;color:#64748b';
-
-          return `
-            <div class="riwayat-item">
-              <div class="riwayat-avatar">${inisial}</div>
-              <div class="riwayat-info">
-                <div class="riwayat-nama">${nama}</div>
-                <div class="riwayat-detail">
-                  Masuk: ${p.jam_masuk}
-                  ${p.jam_keluar && p.jam_keluar !== '' ? `· Pulang: ${p.jam_keluar}` : ''}
-                </div>
-              </div>
-              <span class="riwayat-badge" style="${badgeColor}">${p.status}</span>
-            </div>
-          `;
+          return `<div class="riwayat-item"><div class="riwayat-avatar">${inisial}</div><div class="riwayat-info"><div class="riwayat-nama">${nama}</div><div class="riwayat-detail">Masuk: ${p.jam_masuk}${p.jam_keluar && p.jam_keluar !== '' ? ` · Pulang: ${p.jam_keluar}` : ''}</div></div><span class="riwayat-badge" style="${badgeColor}">${p.status}</span></div>`;
         }).join('');
-
-      } catch(e) {
-        listEl.innerHTML = '<div class="empty-state">Gagal memuat riwayat</div>';
-        console.error(e);
-      }
+      } catch(e) { listEl.innerHTML = '<div class="empty-state">Gagal memuat riwayat</div>'; console.error(e); }
     }
 
-    // ==========================================
-    // INITIALIZATION
-    // ==========================================
     function init() {
-      // Cek PIN saat halaman dibuka
-      if (cekPinSudahLogin()) {
-        document.getElementById('pin-screen').style.display = 'none';
-      } else {
-        document.getElementById('pin-screen').style.display = 'flex';
-        setTimeout(() => document.getElementById('pin-input').focus(), 300);
-      }
-
-      // Setup event listeners
-      updateJam();
-      setInterval(updateJam, 1000);
-      
+      if (cekPinSudahLogin()) document.getElementById('pin-screen').style.display = 'none';
+      else { document.getElementById('pin-screen').style.display = 'flex'; setTimeout(() => document.getElementById('pin-input').focus(), 300); }
+      updateJam(); setInterval(updateJam, 1000);
       document.getElementById('pin-login-btn').addEventListener('click', cekPin);
-      document.getElementById('pin-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') cekPin();
-      });
-      
-      document.getElementById('scan-btn').addEventListener('click', () => prosesPresensi(false));
-      document.getElementById('nisn-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') prosesPresensi(false);
-      });
+      document.getElementById('pin-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') cekPin(); });
+      document.getElementById('scan-btn')?.addEventListener('click', () => prosesPresensi(false));
+      document.getElementById('nisn-input')?.addEventListener('keypress', (e) => { if (e.key === 'Enter') prosesPresensi(false); });
       document.getElementById('refresh-btn').addEventListener('click', loadRiwayat);
-      
-      // Load data awal
       loadTahunAjaranAktif();
       loadRiwayat();
-      
-      // Auto refresh riwayat setiap 30 detik
       setInterval(loadRiwayat, 30000);
     }
-
-    // Start the app
     init();
   </script>
 </body>
